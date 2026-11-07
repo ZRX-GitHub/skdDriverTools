@@ -47,17 +47,21 @@
 
 ### 3.1 主窗口（396 × 470，固定尺寸、不可拖动）
 
-
-![alt text](https://github.com/ZRX-GitHub/skdDriverTools/blob/main/mdSrcImg/%E4%B8%BB%E9%A1%B5%E9%9D%A2-%E4%B8%AD%E6%96%87.png)
-![alt text](https://github.com/ZRX-GitHub/skdDriverTools/blob/main/mdSrcImg/%E4%B8%BB%E9%A1%B5%E9%9D%A2-%E5%85%85%E7%94%B5-%E8%8B%B1%E6%96%87.png)
-
-
 - **状态行**：`三颗豆驱动管理 · N台设备 · 已连接`。软件名用品牌蓝、设备数用次级灰、连接状态用绿色；左侧呼吸点与状态色呼应。灰色悬停底衬那一块既是点击热区，也是显示手型光标的唯一范围。
 - **型号行**：绿色状态点 + 品牌（DemiBold）+ 型号；品牌是定语，空间不够时先省略品牌、保证型号完整。
 - **电量环**：环形进度 + 中心百分比；充电时整环转绿并显示闪电与流动光带。**纯有线设备**画满 100% 绿环，中心写绿色「USB供电」，不写百分比（有线鼠标没有电池，写数字等于编数据）。
 - **三张信息卡**：灵敏度 / 回报率 / 连接。卡片默认纯展示，悬停**不**变手型、不亮高亮；只有当前设备可写时，点击卡片才进入编辑模块，右侧下拉按钮才弹挡位面板。
 - **说明行**：固件、序列号后六位、自动刷新周期；没有固件/序列号的无通道设备改显示 `VID:PID XXXX:XXXX`。
 - **主按钮**：按设备形态变成「打开官方网页驱动」/「打开官方软件驱动」/「无官方软件 · 按键调节」（禁用）/「重新扫描」（未连接时）。
+
+![alt text](https://github.com/ZRX-GitHub/skdDriverTools/blob/main/mdSrcImg/%E4%B8%BB%E9%A1%B5%E9%9D%A2-%E4%B8%AD%E6%96%87.png)
+![alt text](https://github.com/ZRX-GitHub/skdDriverTools/blob/main/mdSrcImg/%E4%B8%BB%E9%A1%B5%E9%9D%A2-%E8%8B%B1%E6%96%87.png)
+
+![alt text](https://github.com/ZRX-GitHub/skdDriverTools/blob/main/mdSrcImg/%E4%B8%BB%E9%A1%B5%E9%9D%A2-%E5%85%85%E7%94%B5-%E4%B8%AD%E6%96%87.png)
+![alt text](https://github.com/ZRX-GitHub/skdDriverTools/blob/main/mdSrcImg/%E4%B8%BB%E9%A1%B5%E9%9D%A2-%E5%85%85%E7%94%B5-%E8%8B%B1%E6%96%87.png)
+
+![alt text](https://github.com/ZRX-GitHub/skdDriverTools/blob/main/mdSrcImg/%E4%B8%BB%E9%A1%B5%E9%9D%A2-%E8%AE%BE%E5%A4%87%E7%BC%96%E8%BE%91-%E4%B8%AD%E6%96%87.png)
+![alt text](https://github.com/ZRX-GitHub/skdDriverTools/blob/main/mdSrcImg/%E4%B8%BB%E9%A1%B5%E9%9D%A2-%E8%AE%BE%E5%A4%87%E7%BC%96%E8%BE%91-%E8%8B%B1%E6%96%87.png)
 
 ### 3.2 设备清单弹窗
 
@@ -71,6 +75,10 @@
   - 未连接的设备不进清单
 - **键盘 / 耳机行 `switchable=False`**：不亮悬停底衬、不给手型、点击不发切换信号，也不收起菜单。
 - 头部「N台设备」由 `main.device_menu_rows()` 统一提供行数据，与弹窗行数**始终一致**（含配件）。
+
+![alt text](https://github.com/ZRX-GitHub/skdDriverTools/blob/main/mdSrcImg/%E4%B8%BB%E9%A1%B5%E9%9D%A2-%E8%AE%BE%E5%A4%87%E5%BC%B9%E7%AA%97-%E4%B8%AD%E6%96%87.png)
+![alt text](https://github.com/ZRX-GitHub/skdDriverTools/blob/main/mdSrcImg/%E4%B8%BB%E9%A1%B5%E9%9D%A2-%E8%AE%BE%E5%A4%87%E5%BC%B9%E7%AA%97-%E8%8B%B1%E6%96%87.png)
+
 
 ### 3.3 设置浮层
 
@@ -88,6 +96,9 @@
 | 电量图例 | 红 / 橙 / 绿三段，跟着阈值实时变化 |
 
 **纯有线设备接线时**：低电量提醒、提醒阈值两行与底部图例整体置灰禁用，表示「这台没得调」。
+
+![alt text](https://github.com/ZRX-GitHub/skdDriverTools/blob/main/mdSrcImg/%E8%AE%BE%E7%BD%AE%E9%A1%B5%E9%9D%A2-%E4%B8%AD%E6%96%87.png)
+![alt text](https://github.com/ZRX-GitHub/skdDriverTools/blob/main/mdSrcImg/%E8%AE%BE%E7%BD%AE%E9%A1%B5%E9%9D%A2-%E8%8B%B1%E6%96%87.png)
 
 ### 3.4 托盘与右键菜单
 
