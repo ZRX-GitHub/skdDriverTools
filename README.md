@@ -6,6 +6,9 @@
 
 ---
 
+- 如何使用？
+- 把这句话复制给AI，打开本地电脑模式：从 [https://github.com/ZRX-GitHub/skdDriverTools/tree/main](https://github.com/ZRX-GitHub/skdDriverTools/tree/main) 获取源码，读取设备适配指南.md，并适配我的设备，然后打包好软件，放到桌面。
+
 ## 1. 这是什么
 
 三颗豆是一个固定在桌面右下角的迷你玻璃面板，通过 **Windows 原生 HID 接口直接与设备通信**，实时显示：
