@@ -1,0 +1,9 @@
+# 运行时依赖（PySide6-Essentials 只含 QtCore/QtGui/QtWidgets，够用且体积小）
+PySide6-Essentials==6.9.3
+
+# 打包
+pyinstaller==6.22.3
+
+# 说明：本项目不使用 requirements 里的 PySide6 完整包（含 QtWebEngine 等，体积翻倍）。
+# 若 pip 直连 PyPI 很慢，可先下载 wheel 再本地安装：
+#   pip install --no-index --find-links=<wheel目录> PySide6-Essentials==6.9.3
