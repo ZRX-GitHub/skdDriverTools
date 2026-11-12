@@ -223,6 +223,9 @@ TABLE: dict[str, str] = {
     "鼠标电量低": "Low mouse battery",
     "电量 {pct}%，已低于 {thr}%，请及时充电":
         "Battery {pct}% — below {thr}%. Please charge it.",
+    # 电量恰好等于阈值时说「低于」不准确；提醒阈值由设置页决定，正文写清楚
+    "电量 {pct}%，已达设定的 {thr}% 提醒阈值，请及时充电":
+        "Battery {pct}% — reached your {thr}% alert threshold. Please charge.",
 
     # ---------------------------------------------------------------- 日志 / 兜底
     "程序启动失败，详情见日志：\n": "Failed to start. See log:\n",

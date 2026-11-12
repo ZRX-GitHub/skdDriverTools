@@ -55,6 +55,7 @@ import autostart
 import config
 import driver
 import i18n
+import lowbattery
 import monitor as mon
 import notify
 import protocol as P
@@ -1366,9 +1367,8 @@ class MouseGlassWindow(QWidget):
         self._picker_opened_at = 0.0
         self._level_picker_opened_at = 0.0
         self._tray_menu = None
-        self._low_armed = True
-        self._low_notified = 0.0
-        self._low_level = None
+        #: 低电量提醒状态机：每台设备独立一份，阈值完全取自设置页
+        self._low_tracker = lowbattery.LowBatteryTracker()
         #: 当前鼠标走哪种驱动（web / software），用来同步按钮文案与图标
         self._driver_kind = ""
         #: 编辑模式、驱动打开等临时提示：这段时间内 _sync 不覆盖 caption
@@ -1415,9 +1415,11 @@ class MouseGlassWindow(QWidget):
         # 唯一的例外是显示器增删、主屏换人、分辨率变化这类系统环境变更。
         self._watch_screens()
 
+        # 数据变化会即时评估（见 _sync），这个定时器只负责「电量一直不变但
+        # 已经过了兜底重复间隔」以及非当前显示设备的检查，10 秒足够。
         self._low_timer = QTimer(self)
         self._low_timer.timeout.connect(self._check_low_battery)
-        self._low_timer.start(60000)
+        self._low_timer.start(10000)
 
         # 轮询线程若因异常退出，界面会永久停在旧数据；10 秒内自动拉起
         self._watch_timer = QTimer(self)
@@ -1458,7 +1460,7 @@ class MouseGlassWindow(QWidget):
         self.monitor.start()
         self.accessory.start()
         QTimer.singleShot(120, self._sync)
-        QTimer.singleShot(6000, self._check_low_battery)
+        QTimer.singleShot(3000, self._check_low_battery)
         autostart.sync_command()
 
     # ------------------------------------------------------------------ 构建
@@ -2330,6 +2332,8 @@ class MouseGlassWindow(QWidget):
 
     # ------------------------------------------------------------------ 数据同步
     def _sync(self) -> None:
+        # toast 在后台线程投递，失败的气泡补发必须回到 GUI 线程才能调 Qt。
+        notify.pump()
         try:
             self.header.set_devices(self._device_rows())
         except Exception:  # noqa: BLE001
@@ -2344,6 +2348,11 @@ class MouseGlassWindow(QWidget):
             return
         self._last_sig = sig
         self._update_edit_caps(info)
+        # 电量一变就评估，不等定时器：从 31% 掉到 30% 的那一刻就该提醒。
+        try:
+            self._check_low_battery()
+        except Exception:  # noqa: BLE001
+            applog.get("main").exception("低电量提醒评估失败")
 
         # 品牌只在型号行前面拼一段，没品牌（还没扫到任何设备）就不拼，
         # 别再硬写 "CROCIRIS" 冒充——第一行已经固定写着应用名了。
@@ -2553,22 +2562,20 @@ class MouseGlassWindow(QWidget):
         elif key == "lowbat":
             self.cfg.low_battery_notify = value
             config.save(self.cfg)
-            if value:
-                # 刚打开开关：把状态清干净，下一次电量低于阈值就立刻提醒
-                self._low_armed = True
-                self._low_level = None
-                self._low_notified = 0.0
+            # 开关状态交给状态机统一收口；立刻复查一次，重新打开时若电量
+            # 已在阈值以下应马上补一条提醒，不用等下一个轮询周期。
+            self._check_low_battery()
 
     def _on_low_threshold(self, level: int) -> None:
         """设置页改了阈值：电量颜色分界、图例、环、通知一起跟着换。"""
         self.cfg.low_battery_threshold = config.clamp_threshold(level)
         config.save(self.cfg)
         self.ring.set_low_threshold(self.cfg.low_battery_threshold)
-        self._low_armed = True
-        self._low_level = None
-        self._low_notified = 0.0
         # 图例里的 ≤xx% / xx–yy% 文案是面板自己画的，得让它重画一次
         self.settings.update()
+        # 阈值改完马上按新设定重算：从 15% 调成 30% 且当前正好 30%，
+        # 这一刻就应该弹，而不是等最多一个轮询周期。
+        self._check_low_battery()
 
     def _on_language(self, code: str) -> None:
         """切换界面语言：立刻整套换掉，不用重启。
@@ -2784,48 +2791,55 @@ class MouseGlassWindow(QWidget):
         self._dock_bottom_right()
 
     # ------------------------------------------------------------------ 低电量提醒
-    def _check_low_battery(self) -> None:
-        """低于用户设的阈值就弹一次系统通知。
+    def _low_battery_devices(self) -> list[tuple[str, object]]:
+        """给提醒逻辑用的设备快照：每台鼠标一份，不只当前显示的那台。
 
-        开关关掉时什么都不做，但会把「已提醒」状态清掉 —— 重新打开开关后
-        应该能再提醒一次，而不是记着上次已经报过了。
+        设备弹窗里能看到 4 台设备，只盯选中那台会漏掉别的鼠标；状态机按
+        key 分开记，A 报过不会让 B 变成「已提醒」。自检脚本若塞进来的是单个
+        Monitor（没有 sources），就退化成一台，保证老路径也能跑。
         """
-        if not self.cfg.low_battery_notify:
-            self._low_armed = True
-            self._low_level = None
-            return
-
-        low = config.clamp_threshold(self.cfg.low_battery_threshold)
+        sources = getattr(self.monitor, "sources", None)
+        if isinstance(sources, dict) and sources:
+            rows: list[tuple[str, object]] = []
+            for key, src in sources.items():
+                try:
+                    rows.append((str(key), src.snapshot()))
+                except Exception:  # noqa: BLE001
+                    continue
+            return rows
         info = self.monitor.snapshot()
-        # 纯有线鼠标电量恒为 100%，提醒没有意义，也免得以后有人给有线机型
-        # 伪造低电量读数时误弹通知
-        if info.connected and not info.is_wireless:
-            self._low_armed = True
-            self._low_level = None
-            return
-        if not info.connected or info.battery is None or info.charging or info.sleeping:
-            if info.charging or (info.connected and info.battery is not None
-                                 and info.battery > low + 5):
-                self._low_armed = True
-                self._low_level = None
-            return
-        level = info.battery
-        if level > low + 5:
-            self._low_armed = True
-            self._low_level = None
-            return
-        if level > low:
-            return
+        key = str(info.extra.get("device_key") or "current")
+        return [(key, info)]
 
+    def _check_low_battery(self) -> None:
+        """按设置页的阈值逐台检查，需要时投递一条 Windows 通知中心提醒。
+
+        判定规则（含回升、继续下降、兜底重复、防抖）都在 lowbattery 模块里，
+        这里只负责取数、发通知、写日志。开关和阈值改动也会立刻走到这里，
+        不用等定时器。
+        """
+        low = config.clamp_threshold(self.cfg.low_battery_threshold)
+        enabled = bool(self.cfg.low_battery_notify)
         now = time.monotonic()
-        escalated = self._low_level is None or level < self._low_level - 3
-        retry = now - self._low_notified > 1800
-        if not (escalated or retry or self._low_armed):
-            return
-        self._low_armed = False
-        self._low_level = level
-        self._low_notified = now
-        notify.low_battery(info.display_model, level, low)
+        log = applog.get("main.lowbattery")
+        for key, info in self._low_battery_devices():
+            decision = self._low_tracker.evaluate(
+                key=key,
+                connected=bool(info.connected),
+                wireless=bool(info.is_wireless),
+                charging=bool(info.charging),
+                sleeping=bool(info.sleeping),
+                battery=info.battery,
+                threshold=low,
+                enabled=enabled,
+                now=now,
+            )
+            if not decision.notify:
+                continue
+            level = int(info.battery)
+            channel = notify.low_battery(info.display_model, level, low)
+            log.info("提醒 %s: %s%% ≤ 阈值 %s%%（%s, 通道 %s）",
+                     info.display_model, level, low, decision.reason, channel)
 
     # ------------------------------------------------------------------ 显示 / 托盘
     def show_window(self) -> None:

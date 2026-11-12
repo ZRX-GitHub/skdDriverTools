@@ -26,7 +26,7 @@ APP_FOLDER = "skdDriver"
 UNINSTALL_EXE = "uninstall.exe"
 DISPLAY_NAME = "三颗豆"
 PUBLISHER = "三颗豆驱动工具"
-VERSION = "1.4.28"
+VERSION = "1.4.29"
 SHORTCUT_NAME = "三颗豆"
 #: 软件描述：exe 属性 + 卸载列表的 Comments
 DESCRIPTION = ("本软件适用不同品牌鼠标驱动的管理，例如DPI、刷新率、电量的管理。"
