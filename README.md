@@ -6,6 +6,8 @@
 
 ---
 
+## 根据自己在用的设备，让AI帮你进行适配！
+
 ## 使用说明，给支持本地AI功能的AI，复制以下这段话：
 > 从 https://github.com/ZRX-GitHub/skdDriverTools/tree/main 获取源码，读取设备适配指南.md，并适配我的设备，然后打包好软件，放到桌面。
 
