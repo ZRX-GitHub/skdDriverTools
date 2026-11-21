@@ -1,6 +1,6 @@
 [ 简体中文](README.md) |  **English**
 
-# Sankadou Feature Introduction
+# Sankedou Feature Introduction
 
 > Documentation Version: **v1.4.29**
 > Supported Platforms: Windows 10 / 11 (x64), Python 3.13 + PySide6 6.9.3
