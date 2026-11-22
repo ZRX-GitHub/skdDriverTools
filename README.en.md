@@ -2,7 +2,7 @@
 
 # Sankedou Feature Introduction
 
-> Documentation Version: **v1.4.29**
+> Documentation Version: **v1.4.31**
 > Supported Platforms: Windows 10 / 11 (x64), Python 3.13 + PySide6 6.9.3
 > Project Mission: **Lightweight status panel and parameter management tool for multi-brand devices**. Runs in the system tray, no browser authorization required, independent of vendor web-based drivers.
 
