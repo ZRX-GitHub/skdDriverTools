@@ -311,12 +311,8 @@ class SetupWindow(QWidget):
         p.setPen(QPen(QColor(pal.text_secondary)))
         p.drawText(QRectF(PAD_X, PATH_LABEL_Y, 200, 14),
                    Qt.AlignLeft | Qt.AlignVCenter, i18n.T("安装位置"))
-        # 右侧小字：说明不管选哪儿都会多出一层 skdDriver 文件夹
-        # （用户要求「不论安装到哪里，都自动创建安装文件夹 skdDriver」）
-        p.setFont(W.app_font(8, QFont.Weight.Normal, 0.3))
-        p.setPen(QPen(QColor(pal.text_tertiary)))
-        p.drawText(QRectF(PAD_X, PATH_LABEL_Y, self.width() - PAD_X * 2, 14),
-                   Qt.AlignRight | Qt.AlignVCenter, i18n.T("自动创建 skdDriver 文件夹"))
+        # 右上角原来还有一行「自动创建 skdDriver 文件夹」的说明，用户要求去掉：
+        # 安装位置标题已经说清了，那行小字只是把标题行挤得很吵。
 
         # 选项行
         for i, (_key, title, hint) in enumerate(ROWS):

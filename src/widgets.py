@@ -772,6 +772,10 @@ class GlassButton(QWidget, AnimMixin):
         self._enabled = True
         # 悬停时的高亮色调："accent" 走主题蓝，"danger" 走红色（关闭按钮）
         self._hover_tint = hover_tint
+        #: 浮窗开着时由主窗口置 True：不做悬停、按下不触发 clicked
+        self._input_locked = False
+        #: 按下被锁挡掉时记一笔，同一次抬键也不能再触发 clicked
+        self._press_absorbed = False
         self.setFixedHeight(height)
         self.setCursor(Qt.PointingHandCursor)
         self.setAttribute(Qt.WA_Hover, True)
@@ -803,8 +807,27 @@ class GlassButton(QWidget, AnimMixin):
         self.setEnabled(enabled)
         self.update()
 
+    def set_input_locked(self, locked: bool) -> None:
+        """浮窗开着时封锁按钮：不悬停、不响应点击（同 InfoCard.set_input_locked）。
+
+        设置面板 / 设备列表是顶层窗口，不抢模态，鼠标落到主按钮上照样会派发
+        按下事件——那一下属于「点浮窗外面收起浮窗」，不该顺带刷新或开驱动。
+        """
+        locked = bool(locked)
+        if locked == self._input_locked:
+            return
+        self._input_locked = locked
+        if locked:
+            if self._hover > 0.001:
+                self._animate_to("_hover", 0.0, 120)
+            if self._press > 0.001:
+                self._animate_to("_press", 0.0, 120)
+        self.setCursor(Qt.ArrowCursor if locked else Qt.PointingHandCursor)
+        self.update()
+
     def enterEvent(self, event) -> None:  # noqa: N802
-        self._animate_to("_hover", 1.0, 170)
+        if not self._input_locked:
+            self._animate_to("_hover", 1.0, 170)
         super().enterEvent(event)
 
     def leaveEvent(self, event) -> None:  # noqa: N802
@@ -813,11 +836,20 @@ class GlassButton(QWidget, AnimMixin):
         super().leaveEvent(event)
 
     def mousePressEvent(self, event) -> None:  # noqa: N802
+        if self._input_locked:
+            # 吃掉这次按下：抬键时也不能补发 clicked
+            self._press_absorbed = True
+            event.accept()
+            return
         if event.button() == Qt.LeftButton:
             self._animate_to("_press", 1.0, 90)
         super().mousePressEvent(event)
 
     def mouseReleaseEvent(self, event) -> None:  # noqa: N802
+        if self._press_absorbed:
+            self._press_absorbed = False
+            event.accept()
+            return
         if event.button() == Qt.LeftButton and self.rect().contains(event.position().toPoint()):
             self._animate_to("_press", 0.0, 260, QEasingCurve.OutBack)
             self.clicked.emit()
@@ -1367,6 +1399,9 @@ class InfoCard(QWidget, AnimMixin):
         self._levels_btn = False
         #: 可编辑卡片的悬停进度（0~1）：只有它能点时才动，不可编辑卡保持零反馈
         self._hover = 0.0
+        #: 浮窗（设置面板 / 设备列表 / 挡位面板）开着时由主窗口置 True：
+        #: 不显示手型、不做悬停、点下去不响应（见 set_input_locked）
+        self._input_locked = False
         self._pick_values: list[int] = []
         self.setMinimumHeight(78)
         self._build_edit_controls()
@@ -1505,7 +1540,31 @@ class InfoCard(QWidget, AnimMixin):
 
     def _hover_ok(self) -> bool:
         """只有「这一下点下去真能进编辑」的卡片才做悬停反馈。"""
-        return self._editable and not self._editing
+        return self._editable and not self._editing and not self._input_locked
+
+    def set_input_locked(self, locked: bool) -> None:
+        """浮窗（设置面板 / 设备列表 / 挡位面板）开着时封锁整张卡片。
+
+        浮窗是顶层窗口，和主窗口之间没有模态关系，鼠标落在卡片上照样会被
+        派发 mousePress——那一下的本意是「点浮窗外面收起来」，却会顺手把
+        卡片切进编辑态，还会在手型/高亮上给出「能点」的假提示（用户报的
+        「打开设备卡片、设置卡片后还能触发主页面的可编辑按钮」）。
+
+        这里在控件层直接拦掉：不显示手型、不做悬停、按下不响应。卡片里的
+        步进器 / 「挡位」「选挡位」按钮一并置为鼠标穿透（外观不变），点在它们
+        身上会落到卡片本身、被上面的分支吃掉；浮窗收起后原样恢复。
+        """
+        locked = bool(locked)
+        if locked == self._input_locked:
+            return
+        self._input_locked = locked
+        for box in (getattr(self, "edit_box", None), getattr(self, "pick_box", None)):
+            if box is not None:
+                box.setAttribute(Qt.WA_TransparentForMouseEvents, locked)
+        if locked and self._hover > 0.001:
+            self._hover = 0.0      # 立刻撤掉残留的高亮，不留动画尾巴
+        self._update_cursor()
+        self.update()
 
     def enterEvent(self, event) -> None:  # noqa: N802
         if self._hover_ok():
@@ -1552,8 +1611,10 @@ class InfoCard(QWidget, AnimMixin):
 
         只看 ``_editable``：挡位模式下「读得到挡位但写不回去」也算不可点
         （用户要求：不支持编辑就不给点击动线，连碰都不该变手型）。
+        ``_input_locked``（浮窗开着）期间一律箭头：这会儿点下去也不会进编辑。
         """
-        self.setCursor(Qt.PointingHandCursor if self._editable else Qt.ArrowCursor)
+        hand = self._editable and not self._input_locked
+        self.setCursor(Qt.PointingHandCursor if hand else Qt.ArrowCursor)
 
     def set_support_app(self, app: str) -> None:
         """不支持编辑时，右上角常驻「由 XX 软件支持」；空串 = 本软件能改，不挂角标。
@@ -1641,6 +1702,10 @@ class InfoCard(QWidget, AnimMixin):
         # 回报率以前是「点一下直接弹浮层、卡片本身毫无变化」，看着像没反应；
         # 现在统一先进卡片内的编辑模块，再点那个下拉按钮才弹挡位面板。
         # 不可编辑的模块一个分支都不走 —— 点了不该有任何动静。
+        if self._input_locked:
+            # 浮窗开着：这一下是「点浮窗外面收起浮窗」，吃掉即可，别顺带进编辑态
+            event.accept()
+            return
         if not self._editing and self._editable:
             self.edit_requested.emit()
         super().mousePressEvent(event)

@@ -1356,6 +1356,11 @@ class MouseGlassWindow(QWidget):
         self._animating = False
         self._quitting = False
         self._menu_open = False
+        #: 浮窗（设置面板 / 设备列表 / 挡位面板）开着时主页面的输入封锁状态
+        self._page_locked = False
+        #: 浮窗关掉后再保持封锁的时间点：挡住「点外面收起浮窗」那一下的回放
+        self._page_lock_hold_until = 0.0
+        self._float_was_open = False
         #: 设备切换弹窗（挂在窗口里的子控件，见 widgets.DeviceMenu）
         self._device_menu = None
         #: 回报率挡位弹窗（顶层浮层，见 widgets.RatePicker）
@@ -2007,6 +2012,7 @@ class MouseGlassWindow(QWidget):
 
     def _update_float_hover_poll(self) -> None:
         """有浮窗（设置面板 / 设备菜单）开着才需要轮询接管头部悬停。"""
+        self._sync_page_input_lock()
         panel_open = self.settings is not None and self.settings.is_open()
         menu_open = self._device_menu is not None and self._device_menu.isVisible()
         if panel_open or menu_open:
@@ -2015,6 +2021,47 @@ class MouseGlassWindow(QWidget):
         else:
             self._float_hover_timer.stop()
             self._clear_float_hover()
+
+    def _has_open_float(self) -> bool:
+        """是否有任何浮窗开着（设置面板 / 设备列表 / 回报率挡位 / DPI 挡位）。"""
+        panel = getattr(self, "settings", None)
+        if panel is not None and panel.is_open():
+            return True
+        menu = self._device_menu
+        if menu is not None and menu.isVisible():
+            return True
+        for picker in (self._rate_picker, self._level_picker):
+            if picker is not None and picker.isVisible():
+                return True
+        return False
+
+    def _sync_page_input_lock(self) -> None:
+        """浮窗开着 → 锁死主页面的可编辑入口；全关了再放开。
+
+        这些浮窗都是不抢模态的顶层窗口，主窗口照旧收得到鼠标事件：不锁的话
+        鼠标划过卡片仍然亮悬停、给手型，点下去还会进编辑态——而用户点那一下
+        的本意只是「收起浮窗」（用户报的第 2 个问题）。头部按钮不锁：它们本来
+        就由 `_on_press_outside` 显式转发，是刻意保留的开关机位。
+
+        「收起浮窗的那一下」还要多锁 250ms：全局钩子里的关闭动作是在 30ms
+        定时器里做的，可能比原生按下事件更晚到，不设宽限期的话那一下会漏进
+        卡片，照样切进编辑态。
+        """
+        opened = self._has_open_float()
+        if self._float_was_open and not opened:
+            self._page_lock_hold_until = time.monotonic() + 0.25
+        self._float_was_open = opened
+        if not opened and self._page_lock_hold_until > time.monotonic():
+            QTimer.singleShot(260, self._sync_page_input_lock)
+        locked = opened or self._page_lock_hold_until > time.monotonic()
+        if locked == self._page_locked:
+            return
+        self._page_locked = locked
+        for card in getattr(self, "cards", ()):
+            card.set_input_locked(locked)
+        for btn in (getattr(self, "btn_primary", None), getattr(self, "btn_refresh", None)):
+            if btn is not None:
+                btn.set_input_locked(locked)
 
     def _poll_float_hover(self) -> None:
         """轮询光标位置，手动驱动头部按钮的悬停高亮和手型光标。
@@ -2530,10 +2577,14 @@ class MouseGlassWindow(QWidget):
         wineffects.set_topmost(int(self.winId()), self.cfg.always_on_top)
 
     def _place_settings(self) -> None:
-        """把面板摆到齿轮正下方、贴着窗口右缘。"""
+        """把面板摆到齿轮正下方、贴着窗口右缘。
+
+        右边距 8px（原来是 10px，用户要求整体往右挪 2px）。不能真的贴到 0：
+        面板自己带 12px 阴影边距，卡片右缘仍要留一点呼吸空间。
+        """
         anchor = self.header.btn_settings
         pos = anchor.mapToGlobal(anchor.rect().bottomLeft())
-        x = self.x() + self.width() - self.settings.width() - 10
+        x = self.x() + self.width() - self.settings.width() - 8
         self.settings.move(x, pos.y() + 6)
 
     def _toggle_settings(self) -> None:

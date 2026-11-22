@@ -187,7 +187,6 @@ TABLE: dict[str, str] = {
     "安装 {name} v{ver}": "Install {name} v{ver}",
     "多品牌鼠标驱动管理 · 版本 {ver}": "Multi-brand mouse driver manager · v{ver}",
     "安装位置": "Install location",
-    "自动创建 skdDriver 文件夹": "Creates a skdDriver folder",
     "安装到 {path}": "Installing to {path}",
     "安装到当前用户，无需管理员权限": "Installs for the current user — no admin rights needed",
     "更改…": "Browse…",
